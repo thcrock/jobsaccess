@@ -10,7 +10,16 @@ https://docs.djangoproject.com/en/1.7/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+import pymlconf
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+GLOBAL_CONFIG_DIR = '/etc/jobsaccess'
+# Load configuration from conf.d directories #
+# default configuration in repo:
+config = pymlconf.ConfigManager(dirs=[os.path.join(BASE_DIR, 'jobsaccess', 'conf.d')], filename_as_namespace=False)
+if os.path.isdir(GLOBAL_CONFIG_DIR):
+    config.load_dirs([os.path.join(GLOBAL_CONFIG_DIR, 'conf.d')], filename_as_namespace=False)
+locals().update((key.upper(), value) for key, value in config.items())
 
 
 # Quick-start development settings - unsuitable for production
@@ -36,6 +45,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'transitfuture',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -51,17 +61,6 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'jobsaccess.urls'
 
 WSGI_APPLICATION = 'jobsaccess.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/1.7/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.7/topics/i18n/
