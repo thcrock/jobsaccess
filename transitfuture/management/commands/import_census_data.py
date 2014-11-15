@@ -9,7 +9,6 @@ class Command(BaseCommand):
     help = 'Imports US Census LODES data'
 
 
-
     def handle(self, *args, **options):
         for segment in ('S000', 'SA01', 'SA02', 'SA03', 'SE01', 'SE02', 'SE03', 'SI01', 'SI02', 'SI03'):
             url = urlopen("http://lehd.ces.census.gov/data/lodes/LODES7/il/wac/il_wac_{}_JT00_2011.csv.gz".format(segment))

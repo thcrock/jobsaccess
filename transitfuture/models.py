@@ -1,6 +1,27 @@
 from django.db import models
 
 
+class PhaseAchieved(models.Model):
+    description = models.CharField(max_length=255)
+    url = models.URLField()
+
+    class Meta:
+        db_table = "phases_achieved"
+
+
+class ReachableCoordinates(models.Model):
+    latitude_start = models.CharField(max_length=12)
+    longitude_start = models.CharField(max_length=12)
+    depart_time = models.DateTimeField()
+    transit_time = models.IntegerField()
+    phase_achieved = models.ForeignKey(PhaseAchieved)
+    latitude_reachable = models.CharField(max_length=12)
+    longitude_reachable = models.CharField(max_length=12)
+
+    class Meta:
+        db_table = "reachable_coordinates"
+
+
 class CensusBlock(models.Model):
     census_block = models.CharField(max_length=15)
     workforce_segment = models.CharField(max_length=6)
