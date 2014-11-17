@@ -39,9 +39,9 @@ def reachable_coordinates(
         ('output', 'POINTS'),
         ('batch', True)
     ))
-    req = urllib2.Request(
-        '{}/opentripplanner-api-webapp/ws/iso?{}'.format(otp_url, data)
-    )
+    url = '{}/opentripplanner-api-webapp/ws/iso?{}'.format(otp_url, data)
+    print "Querying ", url
+    req = urllib2.Request(url)
     otp_coords = json.loads(urllib2.urlopen(req).read())['coordinates']
 
     for coordinate in otp_coords:
