@@ -44,8 +44,9 @@ def reachable_coordinates(
     req = urllib2.Request(url)
     otp_coords = json.loads(urllib2.urlopen(req).read())['coordinates']
 
-    for coordinate in otp_coords:
-        models.ReachableCoordinates.objects.create(
+    print "Bulk creating"
+    models.ReachableCoordinates.objects.bulk_create((
+        models.ReachableCoordinates(
             latitude_start=latitude,
             longitude_start=longitude,
             depart_time=depart_time,
@@ -54,5 +55,7 @@ def reachable_coordinates(
             longitude_reachable=str(coordinate[0])[:12],
             latitude_reachable=str(coordinate[1])[:12],
         )
+    ) for coordinate in otp_coords)
+    print "Bulk create done"
 
     return otp_coords
