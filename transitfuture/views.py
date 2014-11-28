@@ -6,6 +6,7 @@ import json
 
 from transitfuture.forms import JobsForm
 from transitfuture.jobs import get_jobs
+from transitfuture.models import BlockLocations
 
 class JsonHttpResponse(http.HttpResponse):
     """HttpResponse which JSON-encodes its content and whose Content-Type defaults
@@ -16,7 +17,16 @@ class JsonHttpResponse(http.HttpResponse):
         super(JsonHttpResponse, self).__init__(
             content=json.dumps(content), content_type=content_type, *args, **kws)
 
-# Create your views here.
+@require_GET
+def allblocks(request):
+    return JsonHttpResponse(list(BlockLocations.objects.distinct('census_block_id').values('latitude', 'longitude')))
+
+
+@require_GET
+def blockspage(request):
+    return render(request, 'blocks.html')
+
+
 @require_GET
 def jobs(request):
     form = JobsForm(request.GET)

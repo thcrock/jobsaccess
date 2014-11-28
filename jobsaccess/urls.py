@@ -8,5 +8,6 @@ urlpatterns = patterns('',
 
     url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'transitfuture.views.jobs', name='jobs'),
-
+    url(r'^blocks.json', 'transitfuture.views.allblocks', name='allblocks'),
+    url(r'^blocks', 'transitfuture.views.blockspage', name='blockspage'),
 )
