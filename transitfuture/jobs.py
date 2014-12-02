@@ -11,7 +11,7 @@ def get_jobs(
     depart=None,
     transit_time=None
 ):
-    depart = depart or '2014-06-06T09:00:00'
+    depart = depart or '2014-10-06T09:00:00'
     transit_time = transit_time or 10
     reachable_coordinates = otp.reachable_coordinates(
         latitude,

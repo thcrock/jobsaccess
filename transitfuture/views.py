@@ -5,6 +5,7 @@ from collections import Counter
 import json
 
 from transitfuture.forms import JobsForm
+from transitfuture.integration import otp
 from transitfuture.jobs import get_jobs
 from transitfuture.models import BlockLocations
 
@@ -25,6 +26,32 @@ def allblocks(request):
 @require_GET
 def blockspage(request):
     return render(request, 'blocks.html')
+
+
+@require_GET
+def otpresults(request):
+    form = JobsForm(request.GET)
+    if not form.is_valid():
+        return JsonHttpResponse(form.errors, status=400)
+
+    data = form.cleaned_data
+    depart = data['depart'] or '2014-10-06T09:00:00'
+    transit_time = data['transit_time'] or 10
+    lat = data['latitude'][:12]
+    lon = data['longitude'][:12]
+    reachable_coordinates = otp.reachable_coordinates(
+        lat,
+        lon,
+        depart,
+        transit_time,
+        1
+    )
+    return JsonHttpResponse(reachable_coordinates)
+
+
+@require_GET
+def otpresultspage(request):
+    return render(request, 'otpresults.html')
 
 
 @require_GET
