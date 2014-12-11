@@ -115,7 +115,15 @@ def otpresults(request):
         if blocks:
             total_blocks[blocks[0]['census_block']]['blockdata'] = blocks[0]
 
-    return JsonHttpResponse(total_blocks)
+    stuff = [
+        [
+            b,
+            total_blocks[b]['latitude'],
+            total_blocks[b]['longitude'],
+            total_blocks[b].get('blockdata')
+        ] for b in total_blocks
+    ]
+    return JsonHttpResponse(stuff)
 
 
 @require_GET

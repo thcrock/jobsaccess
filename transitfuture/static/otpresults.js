@@ -1,92 +1,49 @@
-// Create the Google Map…
-var startingLocation = new google.maps.LatLng(41.919, -87.69);
-var map = new google.maps.Map(d3.select("#map").node(), {
-  zoom: 12,
-  center: startingLocation,
-  mapTypeId: google.maps.MapTypeId.TERRAIN
-});
+var startingLocation = [41.919, -87.69];
+var map = L.map('map').setView(startingLocation, 15);
 
-var mover = new google.maps.Marker({
-    map: map,
-    position: startingLocation,
-    draggable: true,
-    title: 'Drag me',
-});
+var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
 
-var transit_time = 10;
 
-var overlay;
+var mover = L.marker(startingLocation, { draggable: true }).addTo(map);
 
-function OTPOverlay() {
-    var _data = null;
-    var _div = null;
-    var _projection = null;
+var transit_time = 5;
 
-      function transform(d) {
-        d = new google.maps.LatLng(d[1], d[0]);
-        d = _projection.fromLatLngToDivPixel(d);
-        return d3.select(this)
-            .style("left", (d.x - padding) + "px")
-            .style("top", (d.y - padding) + "px");
-      }
-
-      this.onAdd = function() {
-        _div = d3.select(this.getPanes().overlayLayer).append("div")
-            .attr("class", "stations");
-
-      }
-
-      this.draw = function() {
-          _projection = this.getProjection(),
-              padding = 10;
-
-          var marker = _div.selectAll("svg")
-              .data(_data)
-              .each(transform) // update existing markers
-            .enter().append("svg:svg")
-              .each(transform)
-              .attr("class", "marker");
-
-          // Add a circle.
-          marker.append("svg:circle")
-              .attr("r", 1)
-              .attr("cx", padding)
-              .attr("cy", padding)
-              .attr("fill", "blue");
-
-      }
-
-      this.update = function(data) {
-        if( _data ) {
-            _data.length = 0;
+var url = 'http://localhost:8000/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
+var circles = [];
+var circleLayerGroup;
+var dataCallback = function(data) {
+    while(circles.length > 0) {
+        circles.pop();
+    }
+    if(circleLayerGroup) {
+        map.removeLayer(circleLayerGroup);
+    }
+    for (var d in data) {
+        var coords = [data[d][1], data[d][2]]
+        var popupText = 'Census Block ' + data[d][0] + "<br>";
+        var hasJobs = data[d][3] ? true : false;
+        if(!hasJobs) {
+            popupText += 'No jobs data available';
+        } else {
+            popupText += "Total jobs: " + data[d][3]['C000'];
         }
-        _data = data;
-        if( _div ) {
-            _div.selectAll("svg")
-                .data(_data)
-                .each(transform)
-        }
-      }
 
-      this.onRemove = function() {
-        _div.remove();
-      }
-}
-OTPOverlay.prototype = new google.maps.OverlayView();
+        var options = {
+            color: 'blue',
+            fillOpacity: hasJobs ? 0.9 : 0.2
+        };
+        var circle = L.circle(coords, 10, options).bindPopup(popupText);
+        circles.push(circle);
+    }
+    circleLayerGroup = L.layerGroup(circles).addTo(map);
+};
+mover.on('dragend', function(e) {
 
-var url = 'http://localhost:8000/otp.json?latitude=' + startingLocation.lat() + '&longitude=' + startingLocation.lng() + '&transit_time=' + transit_time;
-var overLayer = new OTPOverlay();
-d3.json(url, function(data) {
-    overLayer.update(data);
-    overLayer.setMap(map);
+    var url = 'http://localhost:8000/otp.json?latitude=' + mover.getLatLng().lat + '&longitude=' + mover.getLatLng().lng + '&transit_time=' + transit_time;
+    d3.json(url, dataCallback);
 });
+d3.json(url, dataCallback);
 
-google.maps.event.addListener(mover, 'dragend', function(event) {
-    var url = 'http://localhost:8000/otp.json?latitude=' + event.latLng.lat() + '&longitude=' + event.latLng.lng() + '&transit_time=' + transit_time;
-    d3.json(url, function(data) {
-        overLayer.setMap(null);
-        overLayer.update(data);
-        overLayer.setMap(map);
-    });
-});
 
