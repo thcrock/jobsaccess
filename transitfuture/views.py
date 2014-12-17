@@ -1,4 +1,5 @@
 from django import http
+from django.db import connection
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 from django.core.serializers.json import DjangoJSONEncoder
@@ -40,22 +41,42 @@ def otpresults(request):
     transit_time = data['transit_time'] or 5
     lat = data['latitude'][:12]
     lon = data['longitude'][:12]
-    reachable_coordinates = otp.reachable_coordinates(
+    otp.reachable_coordinates(
         lat,
         lon,
         depart,
         transit_time,
         1
     )
-    total_blocks = dict()
-    for reachable_lon, reachable_lat in reachable_coordinates:
-        for block in fcc.census_blocks(reachable_lat, reachable_lon):
-            if block not in total_blocks:
-                total_blocks[block] = {
-                    'latitude': reachable_lat,
-                    'longitude': reachable_lon,
-                }
 
+    temp_table_query = """
+        with coords as (
+            select
+                latitude_reachable as latitude,
+                longitude_reachable as longitude
+            from reachable_coordinates
+            where
+                latitude_start = '{lat}' and
+                longitude_start = '{lon}' and
+                depart_time = '{depart}' and
+                transit_time = {transit_time}
+        )
+    """.format(lat=lat, lon=lon, depart=depart, transit_time=transit_time)
+    missing_coordinates = None
+    with connection.cursor() as c:
+        missing_query = """
+            {}
+            select latitude, longitude
+            from coords
+            left join block_locations using (latitude, longitude)
+            where block_locations.id is null
+        """.format(temp_table_query)
+        c.execute(missing_query)
+        missing_coordinates = c.fetchall()
+    for reachable_lat, reachable_lon in missing_coordinates:
+        fcc.census_blocks(reachable_lat, reachable_lon)
+
+    results = None
     cols = [
         'census_block',
         'C000',
@@ -110,20 +131,26 @@ def otpresults(request):
         'CFS04',
         'CFS05',
     ]
-    for blockid in total_blocks.keys():
-        blocks = CensusBlock.objects.filter(census_block=blockid, workforce_segment='S000').values(*cols)
-        if blocks:
-            total_blocks[blocks[0]['census_block']]['blockdata'] = blocks[0]
-
-    stuff = [
-        [
-            b,
-            total_blocks[b]['latitude'],
-            total_blocks[b]['longitude'],
-            total_blocks[b].get('blockdata')
-        ] for b in total_blocks
-    ]
-    return JsonHttpResponse(stuff)
+    select_clause = ",\n".join("max(\"{val}\")".format(val=val) for val in cols)
+    with connection.cursor() as c:
+        full_query = """
+            {}
+            select
+                census_block,
+                max(latitude),
+                max(longitude),
+                {}
+            from coords
+            join block_locations using (latitude, longitude)
+            join census_blocks on (
+                block_locations.census_block_id = census_blocks.id and
+                census_blocks.workforce_segment = 'S000'
+            )
+            group by census_block
+        """.format(temp_table_query, select_clause)
+        c.execute(full_query)
+        results = c.fetchall()
+    return JsonHttpResponse(results)
 
 
 @require_GET

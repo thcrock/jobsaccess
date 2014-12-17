@@ -1,5 +1,5 @@
 var startingLocation = [41.919, -87.69];
-var map = L.map('map').setView(startingLocation, 15);
+var map = L.map('map').setView(startingLocation, 13);
 
 var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -8,7 +8,7 @@ var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x
 
 var mover = L.marker(startingLocation, { draggable: true }).addTo(map);
 
-var transit_time = 5;
+var transit_time = 30;
 
 var url = 'http://localhost:8000/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
 var circles = [];
@@ -27,7 +27,7 @@ var dataCallback = function(data) {
         if(!hasJobs) {
             popupText += 'No jobs data available';
         } else {
-            popupText += "Total jobs: " + data[d][3]['C000'];
+            popupText += "Total jobs: " + data[d][4];
         }
 
         var options = {
