@@ -8,9 +8,9 @@ var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x
 
 var mover = L.marker(startingLocation, { draggable: true }).addTo(map);
 
-var transit_time = 5;
+var transit_time = 30;
 
-var url = 'http://localhost:8000/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
+var url = 'http://23.251.146.21/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
 var circles = [];
 var circleLayerGroup;
 var dataCallback = function(data) {
@@ -41,7 +41,7 @@ var dataCallback = function(data) {
 };
 mover.on('dragend', function(e) {
 
-    var url = 'http://localhost:8000/otp.json?latitude=' + mover.getLatLng().lat + '&longitude=' + mover.getLatLng().lng + '&transit_time=' + transit_time;
+    var url = 'http://23.251.146.21/otp.json?latitude=' + mover.getLatLng().lat + '&longitude=' + mover.getLatLng().lng + '&transit_time=' + transit_time;
     d3.json(url, dataCallback);
 });
 d3.json(url, dataCallback);
