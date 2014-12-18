@@ -39,9 +39,9 @@ def otpresults(request):
     data = form.cleaned_data
     depart = data['depart'] or '2014-10-06T09:00:00'
     transit_time = data['transit_time'] or 5
-    lat = data['latitude'][:12]
-    lon = data['longitude'][:12]
-    otp.reachable_coordinates(
+    lat = data['latitude'][:7]
+    lon = data['longitude'][:8]
+    reachable_coordinates = otp.reachable_coordinates(
         lat,
         lon,
         depart,
@@ -70,11 +70,15 @@ def otpresults(request):
             from coords
             left join block_locations using (latitude, longitude)
             where block_locations.id is null
+            group by 1, 2
         """.format(temp_table_query)
         c.execute(missing_query)
         missing_coordinates = c.fetchall()
-    for reachable_lat, reachable_lon in missing_coordinates:
+    print len(reachable_coordinates), "reachable coordinates,", len(missing_coordinates), "missing coordinates"
+    for i, (reachable_lat, reachable_lon) in enumerate(missing_coordinates):
         fcc.census_blocks(reachable_lat, reachable_lon)
+        if i % 10 == 0:
+            print i, "of", len(missing_coordinates), "coordinates searched"
 
     results = None
     cols = [

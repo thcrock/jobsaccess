@@ -6,8 +6,8 @@ from transitfuture.models import BlockLocations, CensusBlock
 
 
 def census_blocks(latitude, longitude):
-    latitude = str(latitude)[:12]
-    longitude = str(longitude)[:12]
+    latitude = str(latitude)[:7]
+    longitude = str(longitude)[:8]
     queryset = BlockLocations.objects.filter(
         latitude=latitude,
         longitude=longitude
@@ -23,7 +23,7 @@ def census_blocks(latitude, longitude):
         ('showall', True),
     ))
     url = "http://data.fcc.gov/api/block/find?{}".format(data)
-    print "Querying url", url
+    #print "Querying url", url
     result = urllib2.urlopen(url)
     response = json.loads(result.read())['Block']
     if 'intersection' in response:

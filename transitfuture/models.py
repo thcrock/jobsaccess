@@ -15,8 +15,8 @@ class ReachableCoordinates(models.Model):
     depart_time = models.DateTimeField()
     transit_time = models.IntegerField()
     phase_achieved = models.ForeignKey(PhaseAchieved)
-    latitude_reachable = models.CharField(max_length=12)
-    longitude_reachable = models.CharField(max_length=12)
+    latitude_reachable = models.CharField(max_length=7)
+    longitude_reachable = models.CharField(max_length=8)
 
     class Meta:
         db_table = "reachable_coordinates"
@@ -82,8 +82,8 @@ class CensusBlock(models.Model):
 
 
 class BlockLocations(models.Model):
-    latitude = models.CharField(max_length=12)
-    longitude = models.CharField(max_length=12)
+    latitude = models.CharField(max_length=7)
+    longitude = models.CharField(max_length=8)
     census_block = models.ForeignKey(CensusBlock)
 
     class Meta:

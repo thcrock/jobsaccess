@@ -52,8 +52,8 @@ def reachable_coordinates(
                 depart_time=depart_time,
                 transit_time=transit_time,
                 phase_achieved_id=phase_id,
-                longitude_reachable=str(coordinate[0])[:12],
-                latitude_reachable=str(coordinate[1])[:12],
+                longitude_reachable=str(coordinate[0])[:8],
+                latitude_reachable=str(coordinate[1])[:7],
             )
         ) for coordinate in otp_coords)
         print "Bulk create done"
