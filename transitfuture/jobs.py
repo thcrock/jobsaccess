@@ -2,6 +2,7 @@ from django.core.cache import cache
 
 from transitfuture.integration import otp, fcc
 from transitfuture.models import CensusBlock
+import json
 import time
 
 
@@ -82,3 +83,5 @@ def jobs_by_block(latitude, longitude, depart, transit_time):
                 for row in census_blocks:
                     total_blocks[block] = row
     return total_blocks
+
+

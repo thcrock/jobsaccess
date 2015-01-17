@@ -11,5 +11,5 @@ urlpatterns = patterns('',
     url(r'^blocks.json', 'transitfuture.views.allblocks', name='allblocks'),
     url(r'^blocks', 'transitfuture.views.blockspage', name='blockspage'),
     url(r'^otpresults', 'transitfuture.views.otpresultspage'),
-    url(r'^otp.json', 'transitfuture.views.otpresults')
+    url(r'^otp.json', 'transitfuture.views.otpresults'),
 )
