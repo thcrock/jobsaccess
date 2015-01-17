@@ -3,6 +3,7 @@ import math
 import random
 import sys
 
+
 def job_coordinates(jobs_filename):
     with open(jobs_filename, 'r') as jobs_file:
         jobs = json.load(jobs_file)
@@ -12,23 +13,6 @@ def job_coordinates(jobs_filename):
             'attributes': job['attributes'],
             'geoId': job['geoId']
         }
-
-
-def run(jobs_filename):
-    for data in job_coordinates(jobs_filename):
-        min_x = min(coord[0] for coord in data['coordinates'])
-        min_y = min(coord[1] for coord in data['coordinates'])
-        max_x = max(coord[0] for coord in data['coordinates'])
-        max_y = max(coord[1] for coord in data['coordinates'])
-        coords = halton_points(
-            data['coordinates'],
-            sum(data['attributes'].values()),
-            min_x,
-            min_y,
-            max_x - min_x,
-            max_y - min_y
-        )
-        print coords
 
 
 def contains(boundary_points, x, y):
@@ -43,7 +27,7 @@ def contains(boundary_points, x, y):
             result = not result
         i += 1
         j = i
-    return result;
+    return result
 
 
 def halton_number(index, base):
@@ -84,9 +68,35 @@ def halton_points(coordinates, num_points, min_x, min_y, width, height):
             if not contains(coordinates, x, y):
                 next
 
-            coords.append([x, y])
+            coords.append((x, y))
             i += 2
     return coords
 
-if __name__ == '__main__':
-    run('jobs.json')
+jobs_data = {}
+
+
+def load_jobs(jobs_filename):
+    for data in job_coordinates(jobs_filename):
+        min_x = min(coord[0] for coord in data['coordinates'])
+        min_y = min(coord[1] for coord in data['coordinates'])
+        max_x = max(coord[0] for coord in data['coordinates'])
+        max_y = max(coord[1] for coord in data['coordinates'])
+        if data['attributes']:
+            for att, count in data['attributes'].iteritems():
+                jobs_data[(data['geoId'], att)] = halton_points(
+                    data['coordinates'],
+                    count,
+                    min_x,
+                    min_y,
+                    max_x - min_x,
+                    max_y - min_y
+                )
+
+
+load_jobs('jobs.json')
+
+
+def lookup_jobs(block_id, industry):
+    key = (block_id, industry)
+    if key in jobs_data:
+        return jobs_data[key]

@@ -1,28 +1,59 @@
 from django import http
 from django.db import connection
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 from django.core.serializers.json import DjangoJSONEncoder
 from collections import Counter
 import json
+from PIL import Image, ImageDraw
 
 from transitfuture.forms import JobsForm
 from transitfuture.integration import fcc, otp
 from transitfuture.jobs import get_jobs
-from transitfuture.models import BlockLocations, CensusBlock
+from transitfuture.models import BlockLocations
+from transitfuture.halton import lookup_jobs
+
+INDUSTRIES = {
+    'information': '#46DFD3',
+    'transport_utilities': "#FFFF33",
+    "trade": "#E41A1C",
+    "construction_manufacturing": "#A65628",
+    "public_admin": "#FF7F00",
+    "leisure_hospitality": "#FB9A99",
+    "finance": "#00AA0E",
+    "health": "#286FAA",
+    "education": "#6A3D9A",
+    "professional": "#A6CEE3",
+}
+
 
 class JsonHttpResponse(http.HttpResponse):
     """HttpResponse which JSON-encodes its content and whose Content-Type defaults
     to "application/json".
 
     """
-    def __init__(self, content=None, content_type='application/json', *args, **kws):
+    def __init__(
+        self,
+        content=None,
+        content_type='application/json',
+        *args,
+        **kws
+    ):
         super(JsonHttpResponse, self).__init__(
-            content=json.dumps(content, cls=DjangoJSONEncoder), content_type=content_type, *args, **kws)
+            content=json.dumps(content, cls=DjangoJSONEncoder),
+            content_type=content_type, *args, **kws
+        )
+
 
 @require_GET
 def allblocks(request):
-    return JsonHttpResponse(list(BlockLocations.objects.distinct('census_block_id').values('latitude', 'longitude')))
+    return JsonHttpResponse(
+        list(BlockLocations.objects.
+             distinct('census_block_id').
+             values('latitude', 'longitude')
+             )
+    )
 
 
 @require_GET
@@ -74,7 +105,10 @@ def otpresults(request):
         """.format(temp_table_query)
         c.execute(missing_query)
         missing_coordinates = c.fetchall()
-    print len(reachable_coordinates), "reachable coordinates,", len(missing_coordinates), "missing coordinates"
+    print len(reachable_coordinates),\
+        "reachable coordinates,",\
+        len(missing_coordinates),\
+        "missing coordinates"
     for i, (reachable_lat, reachable_lon) in enumerate(missing_coordinates):
         fcc.census_blocks(reachable_lat, reachable_lon)
         if i % 10 == 0:
@@ -160,6 +194,18 @@ def otpresults(request):
 @require_GET
 def otpresultspage(request):
     return render(request, 'otpresults.html')
+
+
+@require_GET
+def tile(request, block_id):
+    img = Image.new("RGB", (256,256), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
+    for industry, color in INDUSTRIES.iteritems():
+        coords = lookup_jobs(block_id, industry)
+        draw.points(coords, fill=color)
+    response = HttpResponse(mimetype="image/png")
+    img.save(response, "PNG")
+    return response
 
 
 @require_GET
