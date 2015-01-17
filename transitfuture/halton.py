@@ -97,6 +97,6 @@ load_jobs('jobs.json')
 
 
 def lookup_jobs(block_id, industry):
-    key = (block_id, industry)
+    key = (unicode(block_id), industry)
     if key in jobs_data:
         return jobs_data[key]
