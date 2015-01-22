@@ -1,4 +1,5 @@
 from django import http
+from django.conf import settings
 from django.db import connection
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -193,17 +194,21 @@ def otpresults(request):
 
 @require_GET
 def otpresultspage(request):
-    return render(request, 'otpresults.html')
+    return render(request, 'otpresults.html', {
+        'domain': settings.DOMAIN,
+        'port': settings.PORT,
+    })
 
 
 @require_GET
 def tile(request, block_id):
-    img = Image.new("RGB", (256,256), "#FFFFFF")
+    img = Image.new("RGBA", (256,256), (255,255,255,0))
     draw = ImageDraw.Draw(img)
     for industry, color in INDUSTRIES.iteritems():
         coords = lookup_jobs(block_id, industry)
-        draw.points(coords, fill=color)
-    response = HttpResponse(mimetype="image/png")
+        print "drawing point at", coords, "with color", color
+        draw.point(coords, fill=color)
+    response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
 

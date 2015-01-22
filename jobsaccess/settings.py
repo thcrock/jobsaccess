@@ -16,9 +16,15 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 GLOBAL_CONFIG_DIR = '/etc/jobsaccess'
 # Load configuration from conf.d directories #
 # default configuration in repo:
-config = pymlconf.ConfigManager(dirs=[os.path.join(BASE_DIR, 'jobsaccess', 'conf.d')], filename_as_namespace=False)
+config = pymlconf.ConfigManager(
+    dirs=[os.path.join(BASE_DIR, 'jobsaccess', 'conf.d')],
+    filename_as_namespace=False
+)
 if os.path.isdir(GLOBAL_CONFIG_DIR):
-    config.load_dirs([os.path.join(GLOBAL_CONFIG_DIR, 'conf.d')], filename_as_namespace=False)
+    config.load_dirs(
+        [os.path.join(GLOBAL_CONFIG_DIR, 'conf.d')],
+        filename_as_namespace=False
+    )
 locals().update((key.upper(), value) for key, value in config.items())
 
 

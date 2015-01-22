@@ -12,4 +12,5 @@ urlpatterns = patterns('',
     url(r'^blocks', 'transitfuture.views.blockspage', name='blockspage'),
     url(r'^otpresults', 'transitfuture.views.otpresultspage'),
     url(r'^otp.json', 'transitfuture.views.otpresults'),
+    url(r'^tiles/(?P<block_id>\d+)', 'transitfuture.views.tile'),
 )

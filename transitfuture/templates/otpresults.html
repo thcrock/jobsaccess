@@ -35,6 +35,10 @@ html, body, #map {
   </head>
   <body>
     <div id="map"></div>
+    <script type="text/javascript">
+        var domain = {{ domain|safe }};
+        var port = {{ port }};
+    </script>
     <script type="text/javascript" src="{{STATIC_URL}}/otpresults.js"></script>
   </body>
 </html>
