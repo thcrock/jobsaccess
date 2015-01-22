@@ -14,6 +14,7 @@ from transitfuture.integration import fcc, otp
 from transitfuture.jobs import get_jobs
 from transitfuture.models import BlockLocations
 from transitfuture.halton import lookup_jobs
+from transitfuture.slippytile import tile_offset
 
 INDUSTRIES = {
     'information': '#46DFD3',
@@ -201,13 +202,15 @@ def otpresultspage(request):
 
 
 @require_GET
-def tile(request, block_id):
+def tile(request, x, y, z, block_id):
     img = Image.new("RGBA", (256,256), (255,255,255,0))
     draw = ImageDraw.Draw(img)
     for industry, color in INDUSTRIES.iteritems():
         coords = lookup_jobs(block_id, industry)
-        print "drawing point at", coords, "with color", color
-        draw.point(coords, fill=color)
+        if coords:
+            scaled_coords = [tile_offset(coord[1], coord[0], int(z), int(x), int(y)) for coord in coords]
+            print "drawing point at", scaled_coords, "with color", color
+            draw.point(scaled_coords, fill=color)
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
