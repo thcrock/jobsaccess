@@ -74,9 +74,11 @@ def halton_points(coordinates, num_points, min_x, min_y, width, height):
 
 jobs_data = {}
 
+census_boundaries = {}
 
 def load_jobs(jobs_filename):
     for data in job_coordinates(jobs_filename):
+        census_boundaries[data['geoId']] = data['coordinates']
         min_x = min(coord[0] for coord in data['coordinates'])
         min_y = min(coord[1] for coord in data['coordinates'])
         max_x = max(coord[0] for coord in data['coordinates'])
@@ -94,6 +96,10 @@ def load_jobs(jobs_filename):
 
 
 load_jobs('jobs.json')
+
+
+def lookup_boundary(block_id):
+    return census_boundaries[block_id]
 
 
 def lookup_jobs(block_id, industry):

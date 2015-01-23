@@ -8,25 +8,26 @@ from django.core.serializers.json import DjangoJSONEncoder
 from collections import Counter
 import json
 from PIL import Image, ImageDraw
+import struct
 
 from transitfuture.forms import JobsForm
 from transitfuture.integration import fcc, otp
 from transitfuture.jobs import get_jobs
 from transitfuture.models import BlockLocations
-from transitfuture.halton import lookup_jobs
+from transitfuture.halton import lookup_jobs, lookup_boundary
 from transitfuture.slippytile import tile_offset
 
 INDUSTRIES = {
-    'information': '#46DFD3',
-    'transport_utilities': "#FFFF33",
-    "trade": "#E41A1C",
-    "construction_manufacturing": "#A65628",
-    "public_admin": "#FF7F00",
-    "leisure_hospitality": "#FB9A99",
-    "finance": "#00AA0E",
-    "health": "#286FAA",
-    "education": "#6A3D9A",
-    "professional": "#A6CEE3",
+    'information': '46DFD3',
+    'transport_utilities': "FFFF33",
+    "trade": "E41A1C",
+    "construction_manufacturing": "A65628",
+    "public_admin": "FF7F00",
+    "leisure_hospitality": "FB9A99",
+    "finance": "00AA0E",
+    "health": "286FAA",
+    "education": "6A3D9A",
+    "professional": "A6CEE3",
 }
 
 
@@ -203,14 +204,18 @@ def otpresultspage(request):
 
 @require_GET
 def tile(request, x, y, z, block_id):
-    img = Image.new("RGBA", (256,256), (255,255,255,0))
+    img = Image.new("RGB", (256,256))
     draw = ImageDraw.Draw(img)
+    boundary_coords = [tile_offset(coord[1], coord[0], int(z), int(x), int(y)) for coord in lookup_boundary(block_id)]
+    print boundary_coords
+    draw.polygon(boundary_coords, outline=(100, 100, 100), fill=(100,100,100))
     for industry, color in INDUSTRIES.iteritems():
         coords = lookup_jobs(block_id, industry)
         if coords:
             scaled_coords = [tile_offset(coord[1], coord[0], int(z), int(x), int(y)) for coord in coords]
             print "drawing point at", scaled_coords, "with color", color
-            draw.point(scaled_coords, fill=color)
+            draw.point(scaled_coords, fill=struct.unpack('BBB',color.decode('hex')))
+    del draw
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
