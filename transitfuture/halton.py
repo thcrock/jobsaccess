@@ -2,6 +2,7 @@ import json
 import math
 import random
 import sys
+from transitfuture.models import BlockBoundary, HaltonPoint, CensusBlock
 
 
 def job_coordinates(jobs_filename):
@@ -72,6 +73,7 @@ def halton_points(coordinates, num_points, min_x, min_y, width, height):
             i += 2
     return coords
 
+"""
 jobs_data = {}
 
 census_boundaries = {}
@@ -101,8 +103,26 @@ load_jobs('jobs.json')
 def lookup_boundary(block_id):
     return census_boundaries[block_id]
 
-
 def lookup_jobs(block_id, industry):
     key = (unicode(block_id), industry)
     if key in jobs_data:
         return jobs_data[key]
+"""
+
+
+def lookup_boundary(block_id):
+    queryset = CensusBlock.objects.filter(census_block=block_id, workforce_segment="S000")
+    if queryset.exists():
+        block = queryset.first()
+        return BlockBoundary.objects.filter(census_block=block).values_list('longitude', 'latitude')
+
+
+def lookup_jobs(block_id, industry):
+    print "looking up", block_id
+    queryset = CensusBlock.objects.filter(census_block=block_id, workforce_segment="S000")
+    if queryset.exists():
+        print "found it", industry
+        block_pk = list(queryset)[0].id
+        return HaltonPoint.objects.\
+            filter(census_block=block_pk, industry=industry).\
+            values_list('longitude', 'latitude')

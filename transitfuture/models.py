@@ -17,6 +17,7 @@ class ReachableCoordinates(models.Model):
     phase_achieved = models.ForeignKey(PhaseAchieved)
     latitude_reachable = models.CharField(max_length=7)
     longitude_reachable = models.CharField(max_length=8)
+    lookup_key = models.CharField(max_length=36, null=True)
 
     class Meta:
         db_table = "reachable_coordinates"
@@ -88,3 +89,22 @@ class BlockLocations(models.Model):
 
     class Meta:
         db_table = "block_locations"
+
+
+class HaltonPoint(models.Model):
+    census_block = models.ForeignKey(CensusBlock)
+    industry = models.CharField(max_length=25)
+    latitude = models.CharField(max_length=7)
+    longitude = models.CharField(max_length=8)
+
+    class Meta:
+        db_table = "halton_points"
+
+
+class BlockBoundary(models.Model):
+    census_block = models.ForeignKey(CensusBlock)
+    latitude = models.CharField(max_length=7)
+    longitude = models.CharField(max_length=8)
+
+    class Meta:
+        db_table = 'block_boundaries'

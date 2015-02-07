@@ -1,4 +1,4 @@
-var startingLocation = [41.919, -87.69];
+var startingLocation = [41.9174, -87.6881];
 var map = L.map('map', {
     center: startingLocation,
     zoom: 13,
@@ -10,46 +10,27 @@ var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x
 }).addTo(map);
 
 var full_prefix = 'http://' + domain + ':' + port;
-var MyOverlay = L.tileLayer(full_prefix + '/static/tiles/{z}/{x}/{y}.png', { opacity: 0.5 }).addTo(map);
 
+var tile_overlay;
 var mover = L.marker(startingLocation, { draggable: true }).addTo(map);
 
-var transit_time = 30;
+var transit_time = 10;
 
 var url = full_prefix + '/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
 
 var circleLayerGroup;
 var dataCallback = function(data) {
-    return;
-    while(circles.length > 0) {
-        circles.pop();
+    var lookup_key = data['lookup_key'];
+    if(tile_overlay && map.hasLayer(tile_overlay)) {
+        map.removeLayer(tile_overlay);
     }
-    if(circleLayerGroup) {
-        map.removeLayer(circleLayerGroup);
-    }
-    for (var d in data) {
-        var coords = [data[d][1], data[d][2]]
-        var popupText = 'Census Block ' + data[d][0] + "<br>";
-        var hasJobs = data[d][3] ? true : false;
-        if(!hasJobs) {
-            popupText += 'No jobs data available';
-        } else {
-            popupText += "Total jobs: " + data[d][4];
-        }
-
-        var options = {
-            color: 'blue',
-            fillOpacity: hasJobs ? 0.9 : 0.2
-        };
-        var circle = L.circle(coords, 10, options).bindPopup(popupText);
-        circles.push(circle);
-    }
-    circleLayerGroup = L.layerGroup(circles).addTo(map);
+    tile_overlay = L.tileLayer(full_prefix + '/tiles/{z}/{x}/{y}/' + lookup_key, { opacity: 0.5 }).addTo(map);
 };
+
+d3.json(url, dataCallback);
 mover.on('dragend', function(e) {
 
     var url = full_prefix + '/otp.json?latitude=' + mover.getLatLng().lat + '&longitude=' + mover.getLatLng().lng + '&transit_time=' + transit_time;
     d3.json(url, dataCallback);
 });
-
 

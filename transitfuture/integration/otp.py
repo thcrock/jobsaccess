@@ -9,7 +9,8 @@ def reachable_coordinates(
     longitude,
     depart_time,
     transit_time,
-    phase_id
+    phase_id,
+    lookup_key
 ):
     coordinates = models.ReachableCoordinates.objects.filter(
         latitude_start=latitude,
@@ -54,6 +55,7 @@ def reachable_coordinates(
                 phase_achieved_id=phase_id,
                 longitude_reachable=str(coordinate[0])[:8],
                 latitude_reachable=str(coordinate[1])[:7],
+                lookup_key=str(lookup_key),
             )
         ) for coordinate in otp_coords)
         print "Bulk create done"

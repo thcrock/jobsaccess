@@ -8,14 +8,13 @@ from django.core.serializers.json import DjangoJSONEncoder
 from collections import Counter
 import json
 from PIL import Image, ImageDraw
-import struct
+import uuid
 
 from transitfuture.forms import JobsForm
 from transitfuture.integration import fcc, otp
 from transitfuture.jobs import get_jobs
 from transitfuture.models import BlockLocations
-from transitfuture.halton import lookup_jobs, lookup_boundary
-from transitfuture.slippytile import tile_offset
+from transitfuture.slippytile import tile_offset, lon2tilex, lat2tiley
 
 INDUSTRIES = {
     'information': '46DFD3',
@@ -70,6 +69,7 @@ def otpresults(request):
     if not form.is_valid():
         return JsonHttpResponse(form.errors, status=400)
 
+    lookup_key = str(uuid.uuid4())
     data = form.cleaned_data
     depart = data['depart'] or '2014-10-06T09:00:00'
     transit_time = data['transit_time'] or 5
@@ -80,7 +80,8 @@ def otpresults(request):
         lon,
         depart,
         transit_time,
-        1
+        1,
+        lookup_key
     )
 
     temp_table_query = """
@@ -191,11 +192,14 @@ def otpresults(request):
         """.format(temp_table_query, select_clause)
         c.execute(full_query)
         results = c.fetchall()
-    return JsonHttpResponse(results)
+
+    return JsonHttpResponse({'lookup_key': lookup_key, 'data': results})
 
 
 @require_GET
 def otpresultspage(request):
+    print settings.DOMAIN
+    print settings.PORT
     return render(request, 'otpresults.html', {
         'domain': settings.DOMAIN,
         'port': settings.PORT,
@@ -203,19 +207,67 @@ def otpresultspage(request):
 
 
 @require_GET
-def tile(request, x, y, z, block_id):
-    img = Image.new("RGB", (256,256))
+def tile(request, z, x, y, lookup_key):
+    """
+        Given a list of census blocks (with sample lat/lon and jobs data), for each census block:
+        1. Lookup boundary for each census block
+        2. Transform each boundary coordinate into tile offset, and crop
+        3. Draw the polygon boundary
+        4. For each industry, lookup halton points, scale, transform, crop, and draw
+    """
+    img = Image.new("RGBA", (256,256), (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
-    boundary_coords = [tile_offset(coord[1], coord[0], int(z), int(x), int(y)) for coord in lookup_boundary(block_id)]
-    print boundary_coords
-    draw.polygon(boundary_coords, outline=(100, 100, 100), fill=(100,100,100))
-    for industry, color in INDUSTRIES.iteritems():
-        coords = lookup_jobs(block_id, industry)
-        if coords:
-            scaled_coords = [tile_offset(coord[1], coord[0], int(z), int(x), int(y)) for coord in coords]
-            print "drawing point at", scaled_coords, "with color", color
-            draw.point(scaled_coords, fill=struct.unpack('BBB',color.decode('hex')))
-    del draw
+    with connection.cursor() as curs:
+        boundary_sql = """
+            select
+                census_block,
+                bb.latitude,
+                bb.longitude
+            from
+                reachable_coordinates rc
+                join block_locations bl on (bl.latitude = rc.latitude_reachable and bl.longitude = rc.longitude_reachable)
+                join census_blocks cb on (bl.census_block_id = cb.id and cb.workforce_segment = 'S000')
+                join block_boundaries bb on (bb.census_block_id = cb.id)
+            where lookup_key = '{}'
+        """.format(lookup_key)
+        curs.execute(boundary_sql)
+        untransformed_boundary = curs.fetchall()
+
+    zoom = int(z)
+    y = int(y)
+    x = int(x)
+    real_boundary_coords = [
+        tile_offset(coord[1], coord[2], zoom)
+        for coord in untransformed_boundary
+        if lon2tilex(coord[2], zoom) == x and lat2tiley(coord[1], zoom) == y
+    ]
+    if len(real_boundary_coords) > 0:
+        print "drawing boundary coords"
+        draw.polygon(real_boundary_coords, outline=(100, 100, 100), fill=(255,0,0))
+        if 1 == 2:
+            with connection.cursor() as c:
+                halton_sql = """
+    select
+        census_block,
+        industry,
+        hp.latitude,
+        hp.longitude
+    from
+        reachable_coordinates rc
+        join block_locations bl on (bl.latitude = rc.latitude_reachable and bl.longitude = rc.longitude_reachable)
+        join census_blocks cb on (bl.census_block_id = cb.id and cb.workforce_segment = 'S000')
+        join halton_points hp on (hp.census_block_id = cb.id)
+    where lookup_key = '{}'
+    """.format(lookup_key)
+                c.execute(halton_sql)
+                coords = c.fetchall()
+                if coords:
+                    scaled_coords = [
+                        tile_offset(coord[2], coord[3], zoom)
+                        for coord in coords
+                        if lon2tilex(coord[3], zoom) == x and lat2tiley(coord[2], zoom) == y
+                    ]
+                    draw.point(scaled_coords, fill=(255,0,0))
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
