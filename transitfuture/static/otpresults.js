@@ -14,7 +14,7 @@ var full_prefix = 'http://' + domain + ':' + port;
 var tile_overlay;
 var mover = L.marker(startingLocation, { draggable: true }).addTo(map);
 
-var transit_time = 10;
+var transit_time = 30;
 
 var url = full_prefix + '/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
 

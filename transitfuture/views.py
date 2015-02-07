@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 from django.core.serializers.json import DjangoJSONEncoder
-from collections import Counter
+from collections import Counter, defaultdict
 import json
 from PIL import Image, ImageDraw
 import uuid
@@ -232,42 +232,44 @@ def tile(request, z, x, y, lookup_key):
         """.format(lookup_key)
         curs.execute(boundary_sql)
         untransformed_boundary = curs.fetchall()
+    boundary_lookup = defaultdict(list)
+    for census_block, lat, lon in untransformed_boundary:
+        boundary_lookup[census_block].append((lat,lon))
 
     zoom = int(z)
     y = int(y)
     x = int(x)
-    real_boundary_coords = [
-        tile_offset(coord[1], coord[2], zoom)
-        for coord in untransformed_boundary
-        if lon2tilex(coord[2], zoom) == x and lat2tiley(coord[1], zoom) == y
-    ]
-    if len(real_boundary_coords) > 0:
-        print "drawing boundary coords"
-        draw.polygon(real_boundary_coords, outline=(100, 100, 100), fill=(255,0,0))
-        if 1 == 2:
-            with connection.cursor() as c:
-                halton_sql = """
-    select
-        census_block,
-        industry,
-        hp.latitude,
-        hp.longitude
-    from
-        reachable_coordinates rc
-        join block_locations bl on (bl.latitude = rc.latitude_reachable and bl.longitude = rc.longitude_reachable)
-        join census_blocks cb on (bl.census_block_id = cb.id and cb.workforce_segment = 'S000')
-        join halton_points hp on (hp.census_block_id = cb.id)
-    where lookup_key = '{}'
-    """.format(lookup_key)
-                c.execute(halton_sql)
-                coords = c.fetchall()
-                if coords:
-                    scaled_coords = [
-                        tile_offset(coord[2], coord[3], zoom)
-                        for coord in coords
-                        if lon2tilex(coord[3], zoom) == x and lat2tiley(coord[2], zoom) == y
-                    ]
-                    draw.point(scaled_coords, fill=(255,0,0))
+    for coord_list in boundary_lookup.values():
+        real_boundary_coords = [
+            tile_offset(lat, lon, zoom)
+            for lat, lon in coord_list
+            if lon2tilex(lon, zoom) == x and lat2tiley(lat, zoom) == y
+        ]
+        if len(real_boundary_coords) > 0:
+            draw.polygon(real_boundary_coords, outline=(100, 100, 100), fill=(200,200,200))
+    with connection.cursor() as curs:
+        halton_sql = """
+            select
+                census_block,
+                industry,
+                hp.latitude,
+                hp.longitude
+            from
+                reachable_coordinates rc
+                join block_locations bl on (bl.latitude = rc.latitude_reachable and bl.longitude = rc.longitude_reachable)
+                join census_blocks cb on (bl.census_block_id = cb.id and cb.workforce_segment = 'S000')
+                join halton_points hp on (hp.census_block_id = cb.id)
+            where lookup_key = '{}'
+""".format(lookup_key)
+        curs.execute(halton_sql)
+        coords = curs.fetchall()
+    if coords:
+        scaled_coords = [
+            tile_offset(lat, lon, zoom)
+            for block, ind, lat, lon in coords
+            if lon2tilex(lon, zoom) == x and lat2tiley(lat, zoom) == y
+        ]
+        draw.point(scaled_coords, fill=(255,0,0))
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
