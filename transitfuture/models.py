@@ -22,6 +22,17 @@ class ReachableCoordinates(models.Model):
     class Meta:
         db_table = "reachable_coordinates"
 
+class BikeReachableCoordinates(models.Model):
+    latitude_start = models.CharField(max_length=12)
+    longitude_start = models.CharField(max_length=12)
+    transit_time = models.IntegerField()
+    latitude_reachable = models.CharField(max_length=7)
+    longitude_reachable = models.CharField(max_length=8)
+    optimize = models.CharField(max_length=5)
+    lookup_key = models.CharField(max_length=36, null=True)
+
+    class Meta:
+        db_table = "bike_reachable_coordinates"
 
 class CensusBlock(models.Model):
     census_block = models.CharField(max_length=15)

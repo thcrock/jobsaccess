@@ -13,7 +13,7 @@ def census_blocks(latitude, longitude):
         longitude=longitude
     )
     if queryset.exists():
-        print "Already found this one"
+        #print "Already found this one"
         return [row.census_block.census_block for row in queryset.all()]
 
     data = urllib.urlencode((

@@ -1,11 +1,11 @@
 var startingLocation = [41.9174, -87.6881];
 var map = L.map('map', {
     center: startingLocation,
-    zoom: 13,
+    zoom: 15,
     maxZoom: 18
 });
 
-var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+var OpenStreetMap_Mapnik = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map);
 
@@ -14,7 +14,7 @@ var full_prefix = 'http://' + domain + ':' + port;
 var tile_overlay;
 var mover = L.marker(startingLocation, { draggable: true }).addTo(map);
 
-var transit_time = 30;
+var transit_time = 10;
 
 var url = full_prefix + '/otp.json?latitude=' + startingLocation[0] + '&longitude=' + startingLocation[1] + '&transit_time=' + transit_time;
 

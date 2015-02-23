@@ -10,11 +10,11 @@ import json
 from PIL import Image, ImageDraw
 import uuid
 
-from transitfuture.forms import JobsForm
+from transitfuture.forms import JobsForm, BikingForm
 from transitfuture.integration import fcc, otp
 from transitfuture.jobs import get_jobs
 from transitfuture.models import BlockLocations
-from transitfuture.slippytile import tile_offset, lon2tilex, lat2tiley
+from transitfuture.slippytile import tile_offset, lon2tilex, lat2tiley, tile2linestring
 
 INDUSTRIES = {
     'information': '46DFD3',
@@ -71,11 +71,11 @@ def otpresults(request):
 
     lookup_key = str(uuid.uuid4())
     data = form.cleaned_data
-    depart = data['depart'] or '2014-10-06T09:00:00'
+    depart = data['depart'] or '2015-02-06T09:00:00'
     transit_time = data['transit_time'] or 5
     lat = data['latitude'][:7]
     lon = data['longitude'][:8]
-    reachable_coordinates = otp.reachable_coordinates(
+    otp.reachable_coordinates(
         lat,
         lon,
         depart,
@@ -84,112 +84,25 @@ def otpresults(request):
         lookup_key
     )
 
-    temp_table_query = """
-        with coords as (
-            select
-                latitude_reachable as latitude,
-                longitude_reachable as longitude
-            from reachable_coordinates
-            where
-                latitude_start = '{lat}' and
-                longitude_start = '{lon}' and
-                depart_time = '{depart}' and
-                transit_time = {transit_time}
-        )
-    """.format(lat=lat, lon=lon, depart=depart, transit_time=transit_time)
-    missing_coordinates = None
-    with connection.cursor() as c:
-        missing_query = """
-            {}
-            select latitude, longitude
-            from coords
-            left join block_locations using (latitude, longitude)
-            where block_locations.id is null
-            group by 1, 2
-        """.format(temp_table_query)
-        c.execute(missing_query)
-        missing_coordinates = c.fetchall()
-    print len(reachable_coordinates),\
-        "reachable coordinates,",\
-        len(missing_coordinates),\
-        "missing coordinates"
-    for i, (reachable_lat, reachable_lon) in enumerate(missing_coordinates):
-        fcc.census_blocks(reachable_lat, reachable_lon)
-        if i % 10 == 0:
-            print i, "of", len(missing_coordinates), "coordinates searched"
-
     results = None
     cols = [
-        'census_block',
         'C000',
-        'CA01',
-        'CA02',
-        'CA03',
-        'CE01',
-        'CE02',
-        'CE03',
-        'CNS01',
-        'CNS02',
-        'CNS03',
-        'CNS04',
-        'CNS05',
-        'CNS06',
-        'CNS07',
-        'CNS08',
-        'CNS09',
-        'CNS10',
-        'CNS11',
-        'CNS12',
-        'CNS13',
-        'CNS14',
-        'CNS15',
-        'CNS16',
-        'CNS17',
-        'CNS18',
-        'CNS19',
-        'CNS20',
-        'CR01',
-        'CR02',
-        'CR03',
-        'CR04',
-        'CR05',
-        'CR07',
-        'CT01',
-        'CT02',
-        'CD01',
-        'CD02',
-        'CD03',
-        'CD04',
-        'CS01',
-        'CS02',
-        'CFA01',
-        'CFA02',
-        'CFA03',
-        'CFA04',
-        'CFA05',
-        'CFS01',
-        'CFS02',
-        'CFS03',
-        'CFS04',
-        'CFS05',
     ]
     select_clause = ",\n".join("max(\"{val}\")".format(val=val) for val in cols)
     with connection.cursor() as c:
         full_query = """
-            {}
             select
                 census_block,
-                max(latitude),
-                max(longitude),
+                max(latitude_reachable),
+                max(longitude_reachable),
                 {}
-            from coords
-            join block_locations using (latitude, longitude)
-            join census_blocks on (
-                block_locations.census_block_id = census_blocks.id and
-                census_blocks.workforce_segment = 'S000'
-            )
+            from reachable_coordinates
+            left join blocks on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
+            left join census_blocks on (geoid10 = census_block and workforce_segment = 'S000')
+            where lookup_key = '{}'
             group by census_block
-        """.format(temp_table_query, select_clause)
+        """.format(select_clause, lookup_key)
+        print full_query
         c.execute(full_query)
         results = c.fetchall()
 
@@ -217,36 +130,37 @@ def tile(request, z, x, y, lookup_key):
     """
     img = Image.new("RGBA", (256,256), (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
+    linestring = 'linestring({})'.format(tile2linestring(x, y, z))
+    print x, y, linestring
     with connection.cursor() as curs:
         boundary_sql = """
             select
-                census_block,
-                bb.latitude,
-                bb.longitude
+                geoid10,
+                st_asgeojson(geom)
             from
-                reachable_coordinates rc
-                join block_locations bl on (bl.latitude = rc.latitude_reachable and bl.longitude = rc.longitude_reachable)
-                join census_blocks cb on (bl.census_block_id = cb.id and cb.workforce_segment = 'S000')
-                join block_boundaries bb on (bb.census_block_id = cb.id)
-            where lookup_key = '{}'
-        """.format(lookup_key)
+                blocks
+                join reachable_coordinates on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
+                left join census_blocks on (geoid10 = census_blocks.census_block)
+            where
+                st_intersects(st_polygon(st_geomfromtext('{}'), 4326), geom) and
+                lookup_key = '{}'
+        """.format(linestring, lookup_key)
         curs.execute(boundary_sql)
         untransformed_boundary = curs.fetchall()
     boundary_lookup = defaultdict(list)
-    for census_block, lat, lon in untransformed_boundary:
-        boundary_lookup[census_block].append((lat,lon))
-
+    for census_block, geometry in untransformed_boundary:
+        data = json.loads(geometry)
+        boundary_lookup[census_block] = data['coordinates'][0]
     zoom = int(z)
     y = int(y)
     x = int(x)
-    for coord_list in boundary_lookup.values():
-        real_boundary_coords = [
-            tile_offset(lat, lon, zoom)
-            for lat, lon in coord_list
-            if lon2tilex(lon, zoom) == x and lat2tiley(lat, zoom) == y
-        ]
-        if len(real_boundary_coords) > 0:
-            draw.polygon(real_boundary_coords, outline=(100, 100, 100), fill=(200,200,200))
+    for block_id, polygon in boundary_lookup.iteritems():
+        for coord_list in polygon:
+            real_boundary_coords = [
+                tile_offset(lat, lon, x, y, zoom)
+                for lon, lat in coord_list
+            ]
+            #draw.polygon(real_boundary_coords, outline=(50, 50, 50), fill=(125,125,125))
     with connection.cursor() as curs:
         halton_sql = """
             select
@@ -255,24 +169,27 @@ def tile(request, z, x, y, lookup_key):
                 hp.latitude,
                 hp.longitude
             from
-                reachable_coordinates rc
-                join block_locations bl on (bl.latitude = rc.latitude_reachable and bl.longitude = rc.longitude_reachable)
-                join census_blocks cb on (bl.census_block_id = cb.id and cb.workforce_segment = 'S000')
-                join halton_points hp on (hp.census_block_id = cb.id)
-            where lookup_key = '{}'
-""".format(lookup_key)
+                blocks
+                join reachable_coordinates on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
+                join halton hp on (geoid10 = hp.census_block)
+            where
+                st_intersects(st_polygon(st_geomfromtext('{}'), 4326), geom) and
+                lookup_key = '{}'
+        """.format(linestring, lookup_key)
         curs.execute(halton_sql)
         coords = curs.fetchall()
     if coords:
         scaled_coords = [
-            tile_offset(lat, lon, zoom)
+            tile_offset(lat, lon, x, y, zoom)
             for block, ind, lat, lon in coords
-            if lon2tilex(lon, zoom) == x and lat2tiley(lat, zoom) == y
         ]
+        if scaled_coords:
+            print "found a job", scaled_coords
         draw.point(scaled_coords, fill=(255,0,0))
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
+
 
 
 @require_GET
@@ -342,3 +259,33 @@ def jobs(request):
         for attribute in attributes:
             sums[attribute] += getattr(jobs[block], attribute)
     return JsonHttpResponse(sums)
+
+
+@require_GET
+def bikeshedspage(request):
+    return render(request, 'biking.html', {
+        'domain': settings.DOMAIN,
+        'port': settings.PORT,
+    })
+
+
+def bikeshed(request):
+    form = BikingForm(request.GET)
+    if not form.is_valid():
+        return JsonHttpResponse(form.errors, status=400)
+
+    data = form.cleaned_data
+
+    reachable_polygon = otp.bikeshed(
+        data['latitude'][:7],
+        data['longitude'][:8],
+        data['bike_speed'],
+        data['safety'],
+        data['slope'],
+        data['quick'],
+        data['transit_time'],
+    )
+    return JsonHttpResponse({
+        'type': 'Feature',
+        'geometry': reachable_polygon,
+    })

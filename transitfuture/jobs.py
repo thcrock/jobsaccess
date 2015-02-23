@@ -49,6 +49,24 @@ def get_jobs(
     return total_blocks
 
 
+def jobs_from_coords(reachable_coordinates):
+    total_blocks = {}
+    for lon, lat in reachable_coordinates:
+        #print "checking", lon, lat
+        blocks = fcc.census_blocks(lat, lon)
+
+        for block in blocks:
+            if block not in total_blocks:
+                census_blocks = CensusBlock.objects.filter(
+                    census_block=block,
+                    workforce_segment='S000',  # all segments
+                ).all()
+
+                for row in census_blocks:
+                    total_blocks[block] = row
+    scalar = sum(total_blocks.values())
+    return scalar
+
 def jobs_by_block(latitude, longitude, depart, transit_time):
     reachable_coordinates = otp.reachable_coordinates(
         latitude,
