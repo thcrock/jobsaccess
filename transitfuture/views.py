@@ -131,16 +131,16 @@ def tile(request, z, x, y, lookup_key):
     img = Image.new("RGBA", (256,256), (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
     linestring = 'linestring({})'.format(tile2linestring(x, y, z))
-    print x, y, linestring
     with connection.cursor() as curs:
         boundary_sql = """
             select
                 geoid10,
-                st_asgeojson(geom)
+                st_asgeojson(geom),
+                "C000" as total_jobs
             from
                 blocks
                 join reachable_coordinates on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
-                left join census_blocks on (geoid10 = census_blocks.census_block)
+                left join census_blocks on (geoid10 = census_blocks.census_block and workforce_segment = 'S000')
             where
                 st_intersects(st_polygon(st_geomfromtext('{}'), 4326), geom) and
                 lookup_key = '{}'
@@ -148,44 +148,30 @@ def tile(request, z, x, y, lookup_key):
         curs.execute(boundary_sql)
         untransformed_boundary = curs.fetchall()
     boundary_lookup = defaultdict(list)
-    for census_block, geometry in untransformed_boundary:
+    for census_block, geometry, total_jobs in untransformed_boundary:
         data = json.loads(geometry)
-        boundary_lookup[census_block] = data['coordinates'][0]
+        boundary_lookup[census_block] = (data['coordinates'][0], total_jobs)
     zoom = int(z)
     y = int(y)
     x = int(x)
-    for block_id, polygon in boundary_lookup.iteritems():
+    for block_id, more_data in boundary_lookup.iteritems():
+        (polygon, total_jobs) = more_data
         for coord_list in polygon:
             real_boundary_coords = [
                 tile_offset(lat, lon, x, y, zoom)
                 for lon, lat in coord_list
             ]
-            #draw.polygon(real_boundary_coords, outline=(50, 50, 50), fill=(125,125,125))
-    with connection.cursor() as curs:
-        halton_sql = """
-            select
-                census_block,
-                industry,
-                hp.latitude,
-                hp.longitude
-            from
-                blocks
-                join reachable_coordinates on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
-                join halton hp on (geoid10 = hp.census_block)
-            where
-                st_intersects(st_polygon(st_geomfromtext('{}'), 4326), geom) and
-                lookup_key = '{}'
-        """.format(linestring, lookup_key)
-        curs.execute(halton_sql)
-        coords = curs.fetchall()
-    if coords:
-        scaled_coords = [
-            tile_offset(lat, lon, x, y, zoom)
-            for block, ind, lat, lon in coords
-        ]
-        if scaled_coords:
-            print "found a job", scaled_coords
-        draw.point(scaled_coords, fill=(255,0,0))
+            if total_jobs is None:
+                draw.polygon(real_boundary_coords, fill=(225,225,225))
+            else:
+                if total_jobs > 255:
+                    shading = 255
+                elif total_jobs < 100:
+                    shading = 100
+                else:
+                    shading = total_jobs
+                density = 255 - shading
+                draw.polygon(real_boundary_coords, fill=(density,density,255))
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
