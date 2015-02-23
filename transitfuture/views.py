@@ -88,25 +88,28 @@ def otpresults(request):
     cols = [
         'C000',
     ]
-    select_clause = ",\n".join("max(\"{val}\")".format(val=val) for val in cols)
+    inner_select_clause = ",\n".join("max(\"{val}\") as \"{val}\"".format(val=val) for val in cols)
+    outer_select_clause = ",\n".join("sum(\"{val}\")".format(val=val) for val in cols)
     with connection.cursor() as c:
         full_query = """
-            select
-                census_block,
-                max(latitude_reachable),
-                max(longitude_reachable),
-                {}
-            from reachable_coordinates
-            left join blocks on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
-            left join census_blocks on (geoid10 = census_block and workforce_segment = 'S000')
-            where lookup_key = '{}'
-            group by census_block
-        """.format(select_clause, lookup_key)
+            select {} from (
+                select
+                    census_block,
+                    max(latitude_reachable),
+                    max(longitude_reachable),
+                    {}
+                from reachable_coordinates
+                left join blocks on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
+                left join census_blocks on (geoid10 = census_block and workforce_segment = 'S000')
+                where lookup_key = '{}'
+                group by census_block
+            ) raw
+        """.format(outer_select_clause, inner_select_clause, lookup_key)
         print full_query
         c.execute(full_query)
         results = c.fetchall()
 
-    return JsonHttpResponse({'lookup_key': lookup_key, 'data': results})
+    return JsonHttpResponse({'lookup_key': lookup_key, 'data': results[0]})
 
 
 @require_GET
@@ -175,7 +178,6 @@ def tile(request, z, x, y, lookup_key):
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response
-
 
 
 @require_GET
