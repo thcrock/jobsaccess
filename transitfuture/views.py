@@ -89,25 +89,29 @@ def otpresults(request):
         'C000',
     ]
     inner_select_clause = ",\n".join("max(\"{val}\") as \"{val}\"".format(val=val) for val in cols)
-    outer_select_clause = ",\n".join("sum(\"{val}\")".format(val=val) for val in cols)
+    outer_select_clause = ",\n".join("sum(\"{val}\") as \"{val}\"".format(val=val) for val in cols)
     with connection.cursor() as c:
-        full_query = """
-            select {} from (
-                select
-                    census_block,
-                    max(latitude_reachable),
-                    max(longitude_reachable),
-                    {}
-                from reachable_coordinates
-                left join blocks on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
-                left join census_blocks on (geoid10 = census_block and workforce_segment = 'S000')
-                where lookup_key = '{}'
-                group by census_block
-            ) raw
-        """.format(outer_select_clause, inner_select_clause, lookup_key)
-        print full_query
-        c.execute(full_query)
-        results = c.fetchall()
+        try:
+            full_query = """
+                create table "results_{lookup}" as (
+                    select
+                        census_block,
+                        max(latitude_reachable) as latitude_reachable,
+                        max(longitude_reachable) as longitude_reachable,
+                        {inner_select}
+                    from reachable_coordinates
+                    left join blocks on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
+                    left join census_blocks on (geoid10 = census_block and workforce_segment = 'S000')
+                    where lookup_key = '{lookup}'
+                    group by census_block
+                );
+                select {outer_select} from "results_{lookup}"
+            """.format(lookup=lookup_key, outer_select=outer_select_clause, inner_select=inner_select_clause)
+            print full_query
+            c.execute(full_query)
+            results = c.fetchall()
+        except Exception, e:
+            print e
 
     return JsonHttpResponse({'lookup_key': lookup_key, 'data': results[0]})
 
@@ -131,53 +135,54 @@ def tile(request, z, x, y, lookup_key):
         3. Draw the polygon boundary
         4. For each industry, lookup halton points, scale, transform, crop, and draw
     """
-    img = Image.new("RGBA", (256,256), (255, 255, 255, 0))
-    draw = ImageDraw.Draw(img)
-    linestring = 'linestring({})'.format(tile2linestring(x, y, z))
-    with connection.cursor() as curs:
-        boundary_sql = """
-            select
-                geoid10,
-                st_asgeojson(geom),
-                "C000" as total_jobs
-            from
-                blocks
-                join reachable_coordinates on (ST_contains(geom, ST_Point(cast(longitude_reachable as float), cast(latitude_reachable as float))::geography::geometry))
-                left join census_blocks on (geoid10 = census_blocks.census_block and workforce_segment = 'S000')
-            where
-                st_intersects(st_polygon(st_geomfromtext('{}'), 4326), geom) and
-                lookup_key = '{}'
-        """.format(linestring, lookup_key)
-        curs.execute(boundary_sql)
-        untransformed_boundary = curs.fetchall()
-    boundary_lookup = defaultdict(list)
-    for census_block, geometry, total_jobs in untransformed_boundary:
-        data = json.loads(geometry)
-        boundary_lookup[census_block] = (data['coordinates'][0], total_jobs)
-    zoom = int(z)
-    y = int(y)
-    x = int(x)
-    for block_id, more_data in boundary_lookup.iteritems():
-        (polygon, total_jobs) = more_data
-        for coord_list in polygon:
-            real_boundary_coords = [
-                tile_offset(lat, lon, x, y, zoom)
-                for lon, lat in coord_list
-            ]
-            if total_jobs is None:
-                draw.polygon(real_boundary_coords, fill=(225,225,225))
-            else:
-                if total_jobs > 255:
-                    shading = 255
-                elif total_jobs < 100:
-                    shading = 100
+    try:
+        img = Image.new("RGBA", (256,256), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(img)
+        linestring = 'linestring({})'.format(tile2linestring(x, y, z))
+        with connection.cursor() as curs:
+            boundary_sql = """
+                select
+                    geoid10,
+                    st_asgeojson(geom),
+                    "C000" as total_jobs
+                from
+                    "results_{}"
+                    join blocks on (geoid10 = census_block)
+                where
+                    st_intersects(st_polygon(st_geomfromtext('{}'), 4326), geom)
+            """.format(lookup_key, linestring)
+            curs.execute(boundary_sql)
+            untransformed_boundary = curs.fetchall()
+        boundary_lookup = defaultdict(list)
+        for census_block, geometry, total_jobs in untransformed_boundary:
+            data = json.loads(geometry)
+            boundary_lookup[census_block] = (data['coordinates'][0], total_jobs)
+        zoom = int(z)
+        y = int(y)
+        x = int(x)
+        for block_id, more_data in boundary_lookup.iteritems():
+            (polygon, total_jobs) = more_data
+            for coord_list in polygon:
+                real_boundary_coords = [
+                    tile_offset(lat, lon, x, y, zoom)
+                    for lon, lat in coord_list
+                ]
+                if total_jobs is None:
+                    draw.polygon(real_boundary_coords, fill=(225,225,225))
                 else:
-                    shading = total_jobs
-                density = 255 - shading
-                draw.polygon(real_boundary_coords, fill=(density,density,255))
-    response = HttpResponse(content_type="image/png")
-    img.save(response, "PNG")
-    return response
+                    if total_jobs > 255:
+                        shading = 255
+                    elif total_jobs < 100:
+                        shading = 100
+                    else:
+                        shading = total_jobs
+                    density = 255 - shading
+                    draw.polygon(real_boundary_coords, fill=(density,density,255))
+        response = HttpResponse(content_type="image/png")
+        img.save(response, "PNG")
+        return response
+    except Exception, e:
+        print e
 
 
 @require_GET
