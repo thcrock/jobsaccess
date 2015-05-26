@@ -5,3 +5,6 @@ python-memcached
 django-mbtiles
 Pillow
 requests
+shapely
+Fiona
+rtree

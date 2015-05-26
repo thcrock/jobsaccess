@@ -4,6 +4,7 @@ import urllib2
 from transitfuture import models
 import requests
 
+
 def bikeshed(
     latitude,
     longitude,
@@ -78,4 +79,32 @@ def reachable_coordinates(
     ) for coordinate in otp_coords)
     print "Bulk create done"
 
+    return otp_coords
+
+
+def transitshed(
+    latitude,
+    longitude,
+    depart_time,
+    transit_time,
+    phase_id,
+):
+    otp_url = models.PhaseAchieved.objects.get(pk=phase_id).url
+    data = urllib.urlencode((
+        ('layers', 'traveltime'),
+        ('styles', 'mask'),
+        ('fromPlace', "{},{}".format(latitude, longitude)),
+        ('toPlace', '41.9430420, -87.6416480'),  # doesn't matter
+        ('mode', 'TRANSIT,WALK'),
+        ('time', depart_time),
+        ('maxWalkDistance', 10000),
+        ('walkSpeed', 1.38),
+        ('walkTime', transit_time),
+        ('output', 'POINTS'),
+        ('batch', True)
+    ))
+    url = '{}/opentripplanner-api-webapp/ws/iso?{}'.format(otp_url, data)
+    print "Querying ", url
+    req = urllib2.Request(url)
+    otp_coords = json.loads(urllib2.urlopen(req).read())['coordinates']
     return otp_coords

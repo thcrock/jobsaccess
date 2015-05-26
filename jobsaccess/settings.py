@@ -28,6 +28,12 @@ if os.path.isdir(GLOBAL_CONFIG_DIR):
 locals().update((key.upper(), value) for key, value in config.items())
 
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
 
@@ -57,7 +63,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'transitfuture',
+    'transitfuture.apps.TransitFutureConfig',
 )
 
 MIDDLEWARE_CLASSES = (
