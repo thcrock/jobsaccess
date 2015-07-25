@@ -30,8 +30,12 @@ locals().update((key.upper(), value) for key, value in config.items())
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'jobsaccess',
+        'USER': 'jobsaccess',
+        'PASSWORD': 'jobsaccess',
+        'HOST': 'localhost',
+        'PORT': '',
     }
 }
 # Quick-start development settings - unsuitable for production
@@ -63,7 +67,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'transitfuture.apps.TransitFutureConfig',
+    'transitfuture',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -100,3 +104,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
+SHAPES_PATH = "shapes.p"
+SPATIALINDEX_PATH = "spatialindex.p"
+BLOCKS_PATH = "blocks.p"
+JOBS_PATH = "jobs.p"

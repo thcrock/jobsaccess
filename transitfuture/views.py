@@ -84,15 +84,21 @@ def otpresults(request):
     print "got coords", len(coords), coords[0]
     try:
         config = apps.get_app_config('transitfuture')
+        print "got config"
     except Exception, e:
         print e
     matches = set()
     jobs = 0
+    print "about to iterate through coords"
     for lon, lat in coords:
+        print "processing", lon, lat
         for j in config.spatial_index.intersection((lon, lat)):
+            print "intersection iteration"
             p = Point(lon, lat)
-            if p.within(config.polygons[j]):
-                matches.append(config.block_lookup[j])
+            print "created point"
+            if p.within(config.polygons[j]) and j in config.block_lookup:
+                print "within"
+                matches.add(config.block_lookup[j])
                 break
     jobs = sum(config.jobs_lookup[match] for match in matches)
     print jobs
