@@ -4,6 +4,7 @@ import urllib2
 from transitfuture import models
 import requests
 
+
 def bikeshed(
     latitude,
     longitude,
@@ -78,4 +79,31 @@ def reachable_coordinates(
     ) for coordinate in otp_coords)
     print "Bulk create done"
 
+    return otp_coords
+
+
+def transitshed(
+    latitude,
+    longitude,
+    depart_time,
+    transit_time,
+    phase_id,
+):
+    otp_url = 'http://localhost:8080/otp/routers/default/isochrone'
+    data = urllib.urlencode((
+        ('batch', True),
+        ('fromPlace', "{},{}".format(latitude, longitude)),
+        ('toPlace', '41.9430420, -87.6416480'),  # doesn't matter
+        ('time', '9:00am'),
+        ('date', '06-17-2015'),
+        ('mode', 'TRANSIT,WALK'),
+        ('maxWalkDistance', 10000),
+        ('arriveBy', 'false'),
+        ('locale', 'en'),
+        ('cutoffSec', transit_time*60),
+    ))
+    url = '{}?{}'.format(otp_url, data)
+    print "Querying ", url
+    req = urllib2.Request(url)
+    otp_coords = json.loads(urllib2.urlopen(req).read())['features'][0]['geometry']['coordinates'][0][0]
     return otp_coords
